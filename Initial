@@ -1,0 +1,470 @@
+Public autECLPS_Sec As Object
+Public autECLConnlist_Sec As Object
+Public autECLOIA_Sec As Object
+
+Public Start_Row, SO_Clm, Contr_Clm, Origin_Clm, CaPOD_Clm, DISCH_Clm, DISCH1_Clm, DISCH2_Clm, DISCH3_Clm, HUB_Clm, ARR1_Clm, ARR2_Clm, ARR3_Clm, ARRTT1_Clm, ARRTT2_Clm, ARRTT3_Clm, LOAD1_Clm, LOAD2_Clm, LOAD3_Clm, DESTN_Clm, DEP1_Clm, DEP2_Clm, DEP3_Clm, DEPTT1_Clm, DEPTT2_Clm, DEPTT3_Clm, LOAD4_Clm, DEP4_Clm, DEPTT4_Clm, DISCH4_Clm, ARR4_Clm, ARRTT4_Clm, VSL1_Clm, VSL2_Clm, VSL3_Clm, VSL4_Clm, LOAD5_Clm, DEP5_Clm, DEPTT5_Clm, DISCH5_Clm, ARR5_Clm, ARRTT5_Clm, VSL5_Clm, LOAD6_Clm, DEP6_Clm, DEPTT6_Clm, DISCH6_Clm, ARR6_Clm, ARRTT6_Clm, VSL6_Clm, LOAD7_Clm, DEP7_Clm, DEPTT7_Clm, DISCH7_Clm, ARR7_Clm, ARRTT7_Clm, VSL7_Clm As String
+Public SO, Contr, Origin, CaPOD, DISCH, DISCH1, DISCH2, DISCH3, HUB, LOAD1, LOAD2, LOAD3, DESTN, DEP1, DEP2, DEP3, ARR1, ARR2, ARR3, DEPTT1, DEPTT2, DEPTT3, ARRTT1, ARRTT2, ARRTT3, LOAD4, DEP4, DEPTT4, DISCH4, ARR4, ARRTT4, VSL1, VSL2, VSL3, VSL4, LOAD5, DEP5, DEPTT5, DISCH5, ARR5, ARRTT5, VSL5, LOAD6, DEP6, DEPTT6, DISCH6, ARR6, ARRTT6, VSL6, LOAD7, DEP7, DEPTT7, DISCH7, ARR7, ARRTT7, VSL7 As String
+
+Public Primary_Session As String
+
+Public SO_Row As Integer
+
+Sub INIT()
+    
+    ' PUW: INITIALIZATION OF REFERENCE VARIABLES
+    '******************************************
+      
+    Start_Row = 7
+    SO_Clm = "D"
+    Contr_Clm = "AU"
+    Origin_Clm = "AV"
+    DESTN_Clm = "AW"
+    DISCH_Clm = "AX"
+    CaPOD_Clm = "AY"
+    
+    LOAD1_Clm = "AZ"
+    DEP1_Clm = "BA"
+    DEPTT1_Clm = "BB"
+    DISCH1_Clm = "BC"
+    
+
+    Primary_Session = Range("Primary_Session").Value
+    
+End Sub
+
+Function DataLink() As Boolean
+
+On Error GoTo dlError
+INIT
+
+Set autECLPS_Sec = CreateObject("PCOMM.autECLPS")
+Set autECLConnlist_Sec = CreateObject("PCOMM.autECLConnlist")
+Set autECLOIA_Sec = CreateObject("PCOMM.autECLOIA")
+autECLConnlist_Sec.Refresh
+autECLPS_Sec.setconnectionbyname (Primary_Session)
+autECLOIA_Sec.setconnectionbyname (Primary_Session)
+
+'PUW : CHECK FOR RLMOM121 IN PRIMARY SESSION
+'********************************************
+If Trim(autECLPS_Sec.GetText(2, 2, 8)) <> "RLMOM411" Then
+    MsgBox ("Your Session 1 : " & Primary_Session & " is under panel : " & Trim(autECLPS_Sec.GetText(2, 2, 8)) & vbCrLf & "Please change it to RLMOM121 - S/O PANEL and then continue."), vbCritical
+    DataLink = False
+    Exit Function
+End If
+
+DataLink = True
+Exit Function
+
+'PUW : THE ERROR HANDLER
+'**********************
+dlError:
+    MsgBox Err.Description
+    DataLink = False
+    
+Exit Function
+
+End Function
+
+
+Private Sub CollectData_BeforeDragOver(ByVal Cancel As MSForms.ReturnBoolean, ByVal Data As MSForms.DataObject, ByVal X As Single, ByVal Y As Single, ByVal DragState As MSForms.fmDragState, ByVal Effect As MSForms.ReturnEffect, ByVal Shift As Integer)
+
+End Sub
+
+Private Sub CollectData_Click()
+If DataLink Then
+
+
+    SO_Row = Start_Row
+  
+    
+    Do
+       RA = ""
+       RA = SO_Clm & SO_Row
+       SO = Trim(Range(RA).Value)
+       SO = Replace(SO, " ", "")
+       
+       If SO = "" Then
+          SO_Row = SO_Row + 1
+          
+          RA = ""
+          RA = SO_Clm & SO_Row
+          SO = Trim(Range(RA).Value)
+          SO = Replace(SO, " ", "")
+          
+          If SO = "" Then
+             MsgBox "Process successfuly completed !!!", vbInformation, "Process Contrus"
+             Exit Do
+          End If
+       End If
+       
+       'SO = "TUT00" & SO
+       
+       autECLPS_Sec.SendKeys "[eraseeof]", 5, 15
+       autECLPS_Sec.SendKeys "[eraseeof]", 5, 19
+       
+       autECLPS_Sec.SendKeys SO, 5, 15
+       
+       autECLPS_Sec.SendKeys "[enter]"
+       autECLOIA_Sec.WaitForInputReady
+
+       ' If SO no. is not correct
+       If Trim(autECLPS_Sec.GetText(22, 2, 2)) = "E:" Then
+           MsgBox Trim(autECLPS_Sec.GetText(22, 2, 30)), vbCritical, "Invalid Shipping Order"
+           RA = ""
+           RA = Contrus_Clm & SO_Row
+           Range(RA).Select
+           ActiveCell.FormulaR1C1 = "Shipping Order not Found"
+           GoTo Pra:
+       End If
+       
+       Contr = Trim(autECLPS_Sec.GetText(5, 49, 11))
+       RA = ""
+       RA = Contr_Clm & SO_Row
+       Range(RA).Select
+       ActiveCell.FormulaR1C1 = Contr
+       
+       Origin = Trim(autECLPS_Sec.GetText(8, 20, 2))
+       RA = ""
+       RA = Origin_Clm & SO_Row
+       Range(RA).Select
+       ActiveCell.FormulaR1C1 = Origin
+       
+       
+       DESTN = Trim(autECLPS_Sec.GetText(8, 38, 2))
+       RA = ""
+       RA = DESTN_Clm & SO_Row
+       Range(RA).Select
+       ActiveCell.FormulaR1C1 = DESTN
+              
+       DISCH = Trim(autECLPS_Sec.GetText(9, 20, 2))
+       RA = ""
+       RA = DISCH_Clm & SO_Row
+       Range(RA).Select
+       ActiveCell.FormulaR1C1 = DISCH
+       
+       CaPOD = Trim(autECLPS_Sec.GetText(9, 38, 2))
+       RA = ""
+       RA = CaPOD_Clm & SO_Row
+       Range(RA).Select
+       ActiveCell.FormulaR1C1 = CaPOD
+
+ '=======================================================================
+ 'This finds out if it is a HUB shipment
+       ' Retrieve LOAD1 value
+LOAD1 = UCase(Trim(autECLPS_Sec.GetText(6, 19, 3)))
+
+If LOAD1 = "HUB" Then
+    ' Write LOAD1 to the appropriate cell
+    RA = LOAD1_Clm & SO_Row
+    Range(RA).Select
+    ActiveCell.FormulaR1C1 = LOAD1
+
+' Only proceed if LOAD1 equals "HUB"
+    Dim checkRow As Integer
+    Dim portCode As String
+    Dim portValue As String
+
+    ' Check rows from 15 to 20 (ascending)
+    For checkRow = 15 To 20
+        portCode = Trim(autECLPS_Sec.GetText(checkRow, 56, 3))
+        
+        ' Check for specific 3-letter port codes
+        If portCode = "SIN" Or portCode = "TPP" Or portCode = "HKG" Or portCode = "BUS" Or portCode = "CMB" Then
+            ' Get value from column 64 in the same row
+            portValue = Trim(autECLPS_Sec.GetText(checkRow, 64, 10))
+            
+            ' Insert it into the Excel cell
+            Range(DEP1_Clm & SO_Row).Value = portValue
+            
+            GoTo Pra
+        End If
+    Next checkRow
+
+    ' If no valid port code is found, insert blank
+    Range(DEP1_Clm & SO_Row).Value = ""
+Else
+    ' Not HUB, do not insert anything
+    Range(DEP1_Clm & SO_Row).Value = ""
+End If
+
+
+       
+'Now we need to find the D leg in MODs to find out when the arrival date is
+
+DEP1 = Trim(autECLPS_Sec.GetText(16, 80, 1))
+RA = ""
+RA = DEP1_Clm & SO_Row
+Range(RA).Select
+ActiveCell.FormulaR1C1 = DEP1
+
+If Range(RA).Value = "D" Then
+    ' Retrieve the value from location (15, 64, 10)
+    newValue = Trim(autECLPS_Sec.GetText(15, 64, 10))
+    Range(RA).Value = newValue
+
+Else
+    ' If not "D", check the value from location (17, 80, 1)
+    retrievedValue = Trim(autECLPS_Sec.GetText(17, 80, 1))
+    Range(RA).Value = retrievedValue
+
+    If Range(RA).Value = "D" Then
+        newValue = Trim(autECLPS_Sec.GetText(16, 64, 10))
+        Range(RA).Value = newValue
+
+    Else
+        ' If not "D", check the value from location (18, 80, 1)
+        retrievedValue = Trim(autECLPS_Sec.GetText(18, 80, 1))
+        Range(RA).Value = retrievedValue
+
+        If Range(RA).Value = "D" Then
+            newValue = Trim(autECLPS_Sec.GetText(17, 64, 10))
+            Range(RA).Value = newValue
+
+            ' Check previous rows for "M" or "F"
+            foundValid = False
+            For j = 17 To 15 Step -1
+                prevValue = Trim(autECLPS_Sec.GetText(j, 80, 1))
+                If prevValue = "M" Or prevValue = "F" Then
+                    foundValid = True
+                    ' If "M" or "F" is found, copy data from (j, 64, 10)
+                    newValue = Trim(autECLPS_Sec.GetText(j, 64, 10))
+                    Range(RA).Value = newValue
+                    Exit For
+                End If
+            Next j
+
+            If Not foundValid Then
+                Range(RA).Value = ""
+            End If
+
+        Else
+            ' If not "D", check the value from location (19, 80, 1)
+            retrievedValue = Trim(autECLPS_Sec.GetText(19, 80, 1))
+            Range(RA).Value = retrievedValue
+
+            If Range(RA).Value = "D" Then
+                newValue = Trim(autECLPS_Sec.GetText(18, 64, 10))
+                Range(RA).Value = newValue
+
+                ' Check previous rows for "M" or "F"
+                foundValid = False
+                For j = 18 To 15 Step -1
+                    prevValue = Trim(autECLPS_Sec.GetText(j, 80, 1))
+                    If prevValue = "M" Or prevValue = "F" Then
+                        foundValid = True
+                        ' If "M" or "F" is found, copy data from (j, 64, 10)
+                        newValue = Trim(autECLPS_Sec.GetText(j, 64, 10))
+                        Range(RA).Value = newValue
+                        Exit For
+                    End If
+                Next j
+
+                If Not foundValid Then
+                    Range(RA).Value = ""
+                End If
+
+            Else
+                ' If not "D", check the value from location (20, 80, 1)
+                retrievedValue = Trim(autECLPS_Sec.GetText(20, 80, 1))
+                Range(RA).Value = retrievedValue
+
+                If Range(RA).Value = "D" Then
+                    newValue = Trim(autECLPS_Sec.GetText(19, 64, 10))
+                    Range(RA).Value = newValue
+
+                    ' Check previous rows for "M" or "F"
+                    foundValid = False
+                    For j = 19 To 15 Step -1
+                        prevValue = Trim(autECLPS_Sec.GetText(j, 80, 1))
+                        If prevValue = "M" Or prevValue = "F" Then
+                            foundValid = True
+                            ' If "M" or "F" is found, copy data from (j, 64, 10)
+                            newValue = Trim(autECLPS_Sec.GetText(j, 64, 10))
+                            Range(RA).Value = newValue
+                            Exit For
+                        End If
+                    Next j
+
+                    If Not foundValid Then
+                        Range(RA).Value = ""
+                    End If
+
+                Else
+                    ' If not "D", check the value from location (21, 80, 1)
+                    retrievedValue = Trim(autECLPS_Sec.GetText(21, 80, 1))
+                    Range(RA).Value = retrievedValue
+
+                    If Range(RA).Value = "D" Then
+                        newValue = Trim(autECLPS_Sec.GetText(20, 64, 10))
+                        Range(RA).Value = newValue
+
+                        ' Check previous rows for "M" or "F"
+                        foundValid = False
+                        For j = 20 To 15 Step -1
+                            prevValue = Trim(autECLPS_Sec.GetText(j, 80, 1))
+                            If prevValue = "M" Or prevValue = "F" Then
+                                foundValid = True
+                                ' If "M" or "F" is found, copy data from (j, 64, 10)
+                                newValue = Trim(autECLPS_Sec.GetText(j, 64, 10))
+                                Range(RA).Value = newValue
+                                Exit For
+                            End If
+                        Next j
+
+                        If Not foundValid Then
+                            Range(RA).Value = ""
+                        End If
+
+                    End If
+                End If
+            End If
+        End If
+    End If
+End If
+
+
+
+
+'Now we need to find the D leg in MODs to find out when the D-leg date is
+
+       DEPTT1 = Trim(autECLPS_Sec.GetText(16, 80, 1))
+       RA = ""
+       RA = DEPTT1_Clm & SO_Row
+       Range(RA).Select
+       ActiveCell.FormulaR1C1 = DEPTT1
+       
+If Range(RA).Value = "D" Then
+    ' Retrieve the value from location (15, 64, 10)
+    newValue = Trim(autECLPS_Sec.GetText(16, 64, 10))
+    Range(RA).Value = newValue
+    
+Else
+    ' If not "D", check the value from location (17, 80, 1)
+    retrievedValue = Trim(autECLPS_Sec.GetText(17, 80, 1))
+    Range(RA).Value = retrievedValue
+
+    If Range(RA).Value = "D" Then
+        newValue = Trim(autECLPS_Sec.GetText(17, 64, 10))
+        Range(RA).Value = newValue
+    
+    Else
+        ' If not "D", check the value from location (18, 80, 1)
+        retrievedValue = Trim(autECLPS_Sec.GetText(18, 80, 1))
+        Range(RA).Value = retrievedValue
+
+        If Range(RA).Value = "D" Then
+            newValue = Trim(autECLPS_Sec.GetText(18, 64, 10))
+            Range(RA).Value = newValue
+            
+        Else
+            ' If not "D", check the value from location (19, 80, 1)
+            retrievedValue = Trim(autECLPS_Sec.GetText(19, 80, 1))
+            Range(RA).Value = retrievedValue
+
+            If Range(RA).Value = "D" Then
+                newValue = Trim(autECLPS_Sec.GetText(19, 64, 10))
+                Range(RA).Value = newValue
+                
+            Else
+                ' If not "D", check the value from location (20, 80, 1)
+                retrievedValue = Trim(autECLPS_Sec.GetText(20, 80, 1))
+                Range(RA).Value = retrievedValue
+
+                If Range(RA).Value = "D" Then
+                    newValue = Trim(autECLPS_Sec.GetText(20, 64, 10))
+                    Range(RA).Value = newValue
+                    
+                Else
+                    ' If not "D", check the value from location (21, 80, 1)
+                    retrievedValue = Trim(autECLPS_Sec.GetText(21, 80, 1))
+                    Range(RA).Value = retrievedValue
+
+                    If Range(RA).Value = "D" Then
+                        newValue = Trim(autECLPS_Sec.GetText(21, 64, 10))
+                        Range(RA).Value = newValue
+                        
+                    End If
+                End If
+            End If
+        End If
+    End If
+End If
+
+
+       DISCH1 = Trim(autECLPS_Sec.GetText(16, 80, 11))
+       RA = ""
+       RA = DISCH1_Clm & SO_Row
+       Range(RA).Select
+       ActiveCell.FormulaR1C1 = DISCH1
+       
+       If Range(RA).Value = "D" Then
+    ' Retrieve the value from location (15, 64, 10)
+    newValue = Trim(autECLPS_Sec.GetText(15, 75, 1))
+    Range(RA).Value = newValue
+    
+Else
+    ' If not "D", check the value from location (17, 80, 1)
+    retrievedValue = Trim(autECLPS_Sec.GetText(17, 80, 1))
+    Range(RA).Value = retrievedValue
+
+    If Range(RA).Value = "D" Then
+        newValue = Trim(autECLPS_Sec.GetText(16, 75, 1))
+        Range(RA).Value = newValue
+    
+    Else
+        ' If not "D", check the value from location (18, 80, 1)
+        retrievedValue = Trim(autECLPS_Sec.GetText(18, 80, 1))
+        Range(RA).Value = retrievedValue
+
+        If Range(RA).Value = "D" Then
+            newValue = Trim(autECLPS_Sec.GetText(17, 75, 1))
+            Range(RA).Value = newValue
+            
+        Else
+            ' If not "D", check the value from location (19, 80, 1)
+            retrievedValue = Trim(autECLPS_Sec.GetText(19, 80, 1))
+            Range(RA).Value = retrievedValue
+
+            If Range(RA).Value = "D" Then
+                newValue = Trim(autECLPS_Sec.GetText(18, 75, 1))
+                Range(RA).Value = newValue
+                
+            Else
+                ' If not "D", check the value from location (20, 80, 1)
+                retrievedValue = Trim(autECLPS_Sec.GetText(20, 80, 1))
+                Range(RA).Value = retrievedValue
+
+                If Range(RA).Value = "D" Then
+                    newValue = Trim(autECLPS_Sec.GetText(19, 75, 1))
+                    Range(RA).Value = newValue
+                    
+                Else
+                    ' If not "D", check the value from location (21, 80, 1)
+                    retrievedValue = Trim(autECLPS_Sec.GetText(21, 80, 1))
+                    Range(RA).Value = retrievedValue
+
+                    If Range(RA).Value = "D" Then
+                        newValue = Trim(autECLPS_Sec.GetText(20, 75, 1))
+                        Range(RA).Value = newValue
+                        
+                    End If
+                End If
+            End If
+        End If
+    End If
+End If
+       
+       
+Pra:
+       SO_Row = SO_Row + 1
+    Loop
+
+End If
+
+End Sub
+
+
+
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+
+End Sub
