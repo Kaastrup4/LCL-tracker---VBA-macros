@@ -1,0 +1,632 @@
+Sub CopyDataAndCreateNewSheet()
+    Dim sourceWB As Workbook
+    Dim targetWB As Workbook
+    Dim sourceSheet As Worksheet
+    Dim targetSheet As Worksheet
+    Dim newSheetName As String
+    Dim lastRow As Long
+    Dim highestWeek As Integer
+    Dim i As Long
+    Dim targetRow As Long
+    Dim weekNumber As Integer
+    Dim previousSheetName As String
+    Dim pivotCache As pivotCache
+    Dim pivotTable1 As PivotTable
+    Dim pivotTable2 As PivotTable
+    Dim pivotRange As Range
+    Dim chartObj As ChartObject
+    Dim tbl As ListObject
+    Dim newRow As ListRow
+    Dim weekValue As Integer
+    Dim lastR As ListRow
+    Dim colIndexWeek, colIndexRegion, colIndexRegionTotal, colIndexRegionErrors, colIndexRegionP, colIndexTotal, colIndexTotalErrors, colIndexTotalP, colIndexNumberofRepeats As Integer
+    Dim colIndexTotalErrorsNTA, colIndexSigErrorsNTA, colIndexCritErrorsNTA, colIndexPendingCS, colIndexTotalErrorsSSM, colIndexSigErrorsSSM, colIndexCritErrorsSSM, colIndexTotalSDLErrors, colIndexTotalCSAErrors, colIndexTotalMODErrors, colIndexRegionNTA, colIndexRegionSSM, colIndexRegionMOD, colIndexRegionSDL, colIndexRegionCSA As Integer
+    Dim wsCopy As Worksheet
+    Dim pit As PivotTable
+
+    ' Set workbooks
+    Set sourceWB = ThisWorkbook
+    Set targetWB = Workbooks("LCL - Dashboard.xlsx")
+
+    ' Set source worksheet
+    Set sourceSheet = sourceWB.Sheets("LCL tracker")
+
+    ' Find the highest week number
+    highestWeek = 0
+    For Each sheet In targetWB.Sheets
+        If sheet.Name Like "Week *" Then
+            weekNumber = CInt(Mid(sheet.Name, 6))
+            If weekNumber > highestWeek Then highestWeek = weekNumber
+        End If
+    Next sheet
+
+    ' Create new sheet
+    newSheetName = "Week " & (highestWeek + 1)
+    targetWB.Sheets.Add(After:=targetWB.Sheets(targetWB.Sheets.Count)).Name = newSheetName
+    Set targetSheet = targetWB.Sheets(newSheetName)
+
+    ' Copy headers
+    sourceSheet.Range("B6, C6, D6, E6, F6, G6, I6, K6, N6, P6, BD6, AL6").Copy
+    targetSheet.Range("A1").PasteSpecial Paste:=xlPasteValuesAndNumberFormats
+
+    ' Add "Repeats" header in column M
+    targetSheet.Cells(1, 13).Value = "Repeats"
+
+    ' Preserve column widths
+    Dim colMap As Variant
+    colMap = Array("B", "C", "D", "E", "F", "G", "I", "K", "N", "P", "AL", "BD")
+
+    For i = 0 To UBound(colMap)
+        targetSheet.Columns(i + 1).ColumnWidth = sourceSheet.Columns(colMap(i)).ColumnWidth
+    Next i
+
+    ' Copy data where BD has a value
+    targetRow = 2
+    lastRow = sourceSheet.Cells(sourceSheet.Rows.Count, "BD").End(xlUp).Row
+    
+    For i = 7 To lastRow
+    ' If BD is blank, check BE, then BF, and copy value to BD if found
+    If sourceSheet.Cells(i, "BD").Value = "" Then
+        If sourceSheet.Cells(i, "BE").Value <> "" Then
+            sourceSheet.Cells(i, "BD").Value = sourceSheet.Cells(i, "BE").Value
+        ElseIf sourceSheet.Cells(i, "BF").Value <> "" Then
+            sourceSheet.Cells(i, "BD").Value = sourceSheet.Cells(i, "BF").Value
+        End If
+    End If
+
+    ' Copy data where BD has a value
+    If sourceSheet.Cells(i, "BD").Value <> "" Then
+        Dim j As Integer
+        For j = 0 To UBound(colMap)
+            targetSheet.Cells(targetRow, j + 1).Value = sourceSheet.Cells(i, colMap(j)).Value
+        Next j
+        targetRow = targetRow + 1
+    End If
+    Next i
+
+    ' Apply the VLOOKUP formula in column M for "Repeats"
+    previousSheetName = "Week " & highestWeek ' Reference the previous week's sheet
+
+    For i = 2 To targetRow - 1
+        targetSheet.Cells(i, 13).Formula = "=IF(ISERROR(VLOOKUP(B" & i & ",'" & previousSheetName & "'!B:B,1,0)),""NO"",""YES"")"
+    Next i
+    
+    ' Initialize counters for NTA occurrences
+    Dim NTA_Count, Neutral_Count, Bad_Count, HUB_Count, SSM_Count, SSM_Neutral_Count, SSM_Bad_Count, SDL_Count, MOD_Count, CSA_Count, NTA_AME_Count, NTA_ASP_Count, NTA_IND_Count, NTA_LAT_Count, NTA_MED_Count, NTA_NCE_Count, SSM_AME_Count, SSM_ASP_Count, SSM_IND_Count, SSM_LAT_Count, SSM_MED_Count, SSM_NCE_Count As Integer
+    NTA_Count = 0
+    Neutral_Count = 0
+    Bad_Count = 0
+    HUB_Count = 0
+    SSM_Count = 0
+    SSM_Neutral_Count = 0
+    SSM_Bad_Count = 0
+    SDL_Count = 0
+    MOD_Count = 0
+    CSA_Count = 0
+    NTA_AME_Count = 0
+    NTA_ASP_Count = 0
+    NTA_IND_Count = 0
+    NTA_LAT_Count = 0
+    NTA_MED_Count = 0
+    NTA_NCE_Count = 0
+    SSM_AME_Count = 0
+    SSM_ASP_Count = 0
+    SSM_IND_Count = 0
+    SSM_LAT_Count = 0
+    SSM_MED_Count = 0
+    SSM_NCE_Count = 0
+    CSA_AME_Count = 0
+    CSA_ASP_Count = 0
+    CSA_IND_Count = 0
+    CSA_LAT_Count = 0
+    CSA_MED_Count = 0
+    CSA_NCE_Count = 0
+    MOD_AME_Count = 0
+    MOD_ASP_Count = 0
+    MOD_IND_Count = 0
+    MOD_LAT_Count = 0
+    MOD_MED_Count = 0
+    MOD_NCE_Count = 0
+    SDL_AME_Count = 0
+    SDL_ASP_Count = 0
+    SDL_IND_Count = 0
+    SDL_LAT_Count = 0
+    SDL_MED_Count = 0
+    SDL_NCE_Count = 0
+    
+    ' Iterate through the rows again to count NTA values and styles
+    For i = 7 To lastRow
+        ' If BD has a value "NTA", check the style
+        If sourceSheet.Cells(i, "BD").Value = "NTA" Then
+            NTA_Count = NTA_Count + 1
+            
+            ' Check the style of the cell in column BD (Neutral or Bad)
+            If sourceSheet.Cells(i, "BD").Style = "Neutral" Then ' Check if the style is "Neutral"
+                Neutral_Count = Neutral_Count + 1
+            ElseIf sourceSheet.Cells(i, "BD").Style = "Bad" Then ' Check if the style is "Bad"
+                Bad_Count = Bad_Count + 1
+            End If
+        End If
+        
+        ' If BD has a value "SDL", check the style
+        If sourceSheet.Cells(i, "BD").Value = "SDL" Then
+            SDL_Count = SDL_Count + 1
+        End If
+        
+        ' If BD has a value "MOD", check the style
+        If sourceSheet.Cells(i, "BD").Value = "MOD" Then
+            MOD_Count = MOD_Count + 1
+        End If
+        
+        ' If BD has a value "CSA", check the style
+        If sourceSheet.Cells(i, "BD").Value = "CSA" Then
+            CSA_Count = CSA_Count + 1
+        End If
+        
+        ' Check for "HUB" in AZ and if the date in BA is after today's date
+        If sourceSheet.Cells(i, "AZ").Value = "HUB" Then
+            If sourceSheet.Cells(i, "BA").Value < Date Then ' Check if the date in column BA is before today's date
+                HUB_Count = HUB_Count + 1
+            End If
+        End If
+        
+        ' Count "SSM" values in BD
+        If sourceSheet.Cells(i, "BD").Value = "SSM" Then
+            SSM_Count = SSM_Count + 1
+            
+            ' Check the style of the cell in column BD (Neutral or Bad)
+            If sourceSheet.Cells(i, "BD").Style = "Neutral" Then ' Check if the style is "Neutral"
+                SSM_Neutral_Count = SSM_Neutral_Count + 1
+            ElseIf sourceSheet.Cells(i, "BD").Style = "Bad" Then ' Check if the style is "Bad"
+                SSM_Bad_Count = SSM_Bad_Count + 1
+            End If
+        End If
+        
+        If sourceSheet.Cells(i, "BD").Value = "NTA" Then
+        Select Case sourceSheet.Cells(i, "AL").Value
+            Case "AME": NTA_AME_Count = NTA_AME_Count + 1
+            Case "ASP": NTA_ASP_Count = NTA_ASP_Count + 1
+            Case "IND": NTA_IND_Count = NTA_IND_Count + 1
+            Case "LAT": NTA_LAT_Count = NTA_LAT_Count + 1
+            Case "MED": NTA_MED_Count = NTA_MED_Count + 1
+            Case "NCE": NTA_NCE_Count = NTA_NCE_Count + 1
+        End Select
+        End If
+        
+        If sourceSheet.Cells(i, "BD").Value = "SSM" Then
+        Select Case sourceSheet.Cells(i, "AL").Value
+            Case "AME": SSM_AME_Count = SSM_AME_Count + 1
+            Case "ASP": SSM_ASP_Count = SSM_ASP_Count + 1
+            Case "IND": SSM_IND_Count = SSM_IND_Count + 1
+            Case "LAT": SSM_LAT_Count = SSM_LAT_Count + 1
+            Case "MED": SSM_MED_Count = SSM_MED_Count + 1
+            Case "NCE": SSM_NCE_Count = SSM_NCE_Count + 1
+        End Select
+        End If
+        
+        If sourceSheet.Cells(i, "BD").Value = "CSA" Then
+        Select Case sourceSheet.Cells(i, "AL").Value
+            Case "AME": CSA_AME_Count = CSA_AME_Count + 1
+            Case "ASP": CSA_ASP_Count = CSA_ASP_Count + 1
+            Case "IND": CSA_IND_Count = CSA_IND_Count + 1
+            Case "LAT": CSA_LAT_Count = CSA_LAT_Count + 1
+            Case "MED": CSA_MED_Count = CSA_MED_Count + 1
+            Case "NCE": CSA_NCE_Count = CSA_NCE_Count + 1
+        End Select
+        End If
+        
+        If sourceSheet.Cells(i, "BD").Value = "SDL" Then
+        Select Case sourceSheet.Cells(i, "AL").Value
+            Case "AME": SDL_AME_Count = SDL_AME_Count + 1
+            Case "ASP": SDL_ASP_Count = SDL_ASP_Count + 1
+            Case "IND": SDL_IND_Count = SDL_IND_Count + 1
+            Case "LAT": SDL_LAT_Count = SDL_LAT_Count + 1
+            Case "MED": SDL_MED_Count = SDL_MED_Count + 1
+            Case "NCE": SDL_NCE_Count = SDL_NCE_Count + 1
+        End Select
+        End If
+        
+        If sourceSheet.Cells(i, "BD").Value = "MOD" Then
+        Select Case sourceSheet.Cells(i, "AL").Value
+            Case "AME": MOD_AME_Count = MOD_AME_Count + 1
+            Case "ASP": MOD_ASP_Count = MOD_ASP_Count + 1
+            Case "IND": MOD_IND_Count = MOD_IND_Count + 1
+            Case "LAT": MOD_LAT_Count = MOD_LAT_Count + 1
+            Case "MED": MOD_MED_Count = MOD_MED_Count + 1
+            Case "NCE": MOD_NCE_Count = MOD_NCE_Count + 1
+        End Select
+        End If
+        
+    Next i
+    
+    ' ---------- FORMULAS & FORMATTING ----------
+
+    ' Copy values for reference
+    targetSheet.Range("P3").Value = sourceSheet.Range("BL3").Value
+    targetSheet.Range("T2").Value = sourceSheet.Range("BF2").Value
+    targetSheet.Range("U2").Value = sourceSheet.Range("BG2").Value
+    targetSheet.Range("V2").Value = sourceSheet.Range("BH2").Value
+    targetSheet.Range("W2").Value = sourceSheet.Range("BI2").Value
+    targetSheet.Range("X2").Value = sourceSheet.Range("BJ2").Value
+    targetSheet.Range("Y2").Value = sourceSheet.Range("BK2").Value
+    targetSheet.Range("T3").Value = sourceSheet.Range("BF3").Value
+    targetSheet.Range("U3").Value = sourceSheet.Range("BG3").Value
+    targetSheet.Range("V3").Value = sourceSheet.Range("BH3").Value
+    targetSheet.Range("W3").Value = sourceSheet.Range("BI3").Value
+    targetSheet.Range("X3").Value = sourceSheet.Range("BJ3").Value
+    targetSheet.Range("Y3").Value = sourceSheet.Range("BK3").Value
+
+    ' Sheet Name in O2
+    targetSheet.Range("O2").Value = targetSheet.Name
+
+    ' Labels
+    targetSheet.Range("O3").Value = "Total"
+    targetSheet.Range("S3").Value = "Total"
+    targetSheet.Range("O4").Value = "Errors"
+    targetSheet.Range("S4").Value = "Errors"
+    targetSheet.Range("O5").Value = "%"
+    targetSheet.Range("S5").Value = "%"
+
+    ' Formulas
+    targetSheet.Range("P4").Formula = "=COUNTA(K2:K" & targetRow - 1 & ")"
+    targetSheet.Range("P5").Formula = "=P4/P3"
+    targetSheet.Range("P5").NumberFormat = "0%"
+
+    ' COUNTIF formulas for T4:Y4
+    For i = 20 To 25
+        targetSheet.Cells(4, i).Formula = "=COUNTIF(K2:K" & targetRow - 1 & "," & targetSheet.Cells(2, i).Address(False, False) & ")"
+    Next i
+
+    ' Percentage formulas for T5:Y5
+    For i = 20 To 25
+        targetSheet.Cells(5, i).Formula = "=" & targetSheet.Cells(4, i).Address(False, False) & "/" & targetSheet.Cells(3, i).Address(False, False)
+        targetSheet.Cells(5, i).NumberFormat = "0%"
+    Next i
+
+    ' Autofit for better visibility
+    targetSheet.Cells.EntireColumn.AutoFit
+
+' ---------- CREATE PIVOT TABLES ----------
+
+    ' Define data range for pivot tables
+    Set pivotRange = targetSheet.Range("A1").CurrentRegion
+
+    ' Delete existing pivot caches to avoid duplicates
+    For Each pt In targetWB.PivotCaches
+        pt.MissingItemsLimit = xlMissingItemsNone
+    Next pt
+
+    ' Create Pivot Table 1
+    Set pivotCache = targetWB.PivotCaches.Create(SourceType:=xlDatabase, SourceData:=pivotRange)
+    Set pivotTable1 = pivotCache.CreatePivotTable(TableDestination:=targetSheet.Range("O8"), tableName:="PivotTable1")
+
+    ' Configure Pivot Table 1
+    With pivotTable1
+        .PivotFields("Error type").Orientation = xlColumnField
+        .PivotFields("Region").Orientation = xlRowField
+        .PivotFields("Region").Orientation = xlDataField
+        .TableStyle2 = "PivotStyleMedium9"
+    End With
+
+    ' Create Pivot Table 2
+    Set pivotCache = targetWB.PivotCaches.Create(SourceType:=xlDatabase, SourceData:=pivotRange)
+    Set pivotTable2 = pivotCache.CreatePivotTable(TableDestination:=targetSheet.Range("O19"), tableName:="PivotTable2")
+
+    ' Configure Pivot Table 2
+    With pivotTable2
+        .PivotFields("Region").Orientation = xlColumnField
+        .PivotFields("Repeats").Orientation = xlRowField
+        .PivotFields("Region").Orientation = xlDataField
+        .TableStyle2 = "PivotStyleMedium9"
+    End With
+
+' ---------- ADD STACKED COLUMN CHART ----------
+    ' Delete existing chart if any
+    For Each chartObj In targetSheet.ChartObjects
+        If chartObj.TopLeftCell.Address = targetSheet.Range("O26").Address Then
+            chartObj.Delete
+        End If
+    Next chartObj
+
+    ' Insert new chart
+    Set chartObj = targetSheet.ChartObjects.Add(Left:=targetSheet.Range("O26").Left, _
+                                                Width:=500, _
+                                                Top:=targetSheet.Range("O26").Top, _
+                                                Height:=300)
+
+    ' Configure chart
+    With chartObj.Chart
+        .SetSourceData Source:=pivotTable1.TableRange2
+        .ChartType = xlColumnStacked
+        .HasTitle = False
+        .Axes(xlCategory, xlPrimary).HasTitle = True
+        .Axes(xlCategory, xlPrimary).AxisTitle.Text = "Region"
+        .Axes(xlValue, xlPrimary).HasTitle = True
+        .Axes(xlValue, xlPrimary).AxisTitle.Text = "Count"
+        .Legend.Position = xlLegendPositionBottom
+    End With
+    
+    ' ---------- COPY PIVOT TABLE AND CHART TO "COPY THIS SHEET" IN TARGET WORKBOOK ----------
+
+' Get the target sheet "copy this sheet" in the target workbook
+Dim copySheet As Worksheet
+Set copySheet = targetWB.Sheets("Dashboard") ' Reference to the sheet in the target workbook
+
+' Copy Pivot Table 1 and paste it into "copy this sheet" at cell B84
+pivotTable1.TableRange2.Copy
+copySheet.Range("AB113").PasteSpecial Paste:=xlPasteAll
+
+' Copy the chart associated with Pivot Table 1
+Dim pivotChart As ChartObject
+Set pivotChart = targetSheet.ChartObjects(1) ' Assuming the chart is the first chart on the source sheet
+
+' Copy the chart
+pivotChart.Copy
+
+' Delete any chart that overlaps with cell D30
+Dim existingChart As ChartObject
+For Each existingChart In copySheet.ChartObjects
+    If Not Intersect(existingChart.TopLeftCell, copySheet.Range("B24")) Is Nothing Then
+        existingChart.Delete
+        Exit For
+    End If
+Next existingChart
+
+' Paste the chart at B24
+copySheet.Paste
+Dim newChart As ChartObject
+Set newChart = copySheet.ChartObjects(copySheet.ChartObjects.Count) ' Get the last chart
+
+' Move chart so its top-left corner is at B24
+newChart.Left = copySheet.Range("B24").Left
+newChart.Top = copySheet.Range("B24").Top
+
+' Resize the chart (7 cm height, 13 cm width)
+newChart.Width = 369 ' 13 cm in points
+newChart.Height = 198 ' 7 cm in points
+
+' Hide field buttons if it's a PivotChart
+On Error Resume Next
+newChart.Chart.PivotLayout.EnableFieldList = False
+On Error GoTo 0
+
+' ---------- COPY DATA FROM NEW SHEET TO "COPY" SHEET ----------
+    ' Now copy the data from the new sheet (targetSheet) to the "Copy" sheet
+    Set copySheet = targetWB.Sheets("Dashboard")
+
+    ' Copy the range T3:Y5 from targetSheet and paste it to Copy sheet in G104:L106
+    targetSheet.Range("T3:Y5").Copy
+    copySheet.Range("G104").PasteSpecial Paste:=xlPasteValues
+    
+    targetSheet.Range("O2:P5").Copy
+    copySheet.Range("C103").PasteSpecial Paste:=xlPasteValues
+    
+
+' ---------- ADD DATA TO TABLE 14 IN "DATA" SHEET ----------
+
+' Set reference to the target workbook and table
+    Set targetWB = Workbooks("LCL - Dashboard.xlsx")
+    Set tbl = targetWB.Sheets("Data").ListObjects("Table14") ' Table 14 is in the "Data" sheet
+    
+    ' Assuming the new sheet name is already defined or calculated in the previous part of your code
+    newSheetName = "Week " & (highestWeek + 1) ' Replace with actual dynamic sheet name logic
+    
+    ' Get the last row in the table
+    Set lastR = tbl.ListRows(tbl.ListRows.Count)
+    
+    ' Get the current value of the "Week" column in the last row
+    weekValue = lastR.Range.Cells(1, tbl.ListColumns("Week").Index).Value
+    
+    ' Column indices for Table14 based on your description
+    colIndexWeek = tbl.ListColumns("Week").Index
+    colIndexRegion = tbl.ListColumns("Region").Index
+    colIndexRegionTotal = tbl.ListColumns("Region Total").Index
+    colIndexRegionErrors = tbl.ListColumns("Region Errors").Index
+    colIndexRegionP = tbl.ListColumns("Region %").Index
+    colIndexTotal = tbl.ListColumns("Total").Index
+    colIndexTotalErrors = tbl.ListColumns("Total Errors").Index
+    colIndexTotalP = tbl.ListColumns("Total %").Index
+    colIndexNumberofRepeats = tbl.ListColumns("Number of Repeats").Index
+    colIndexTotalErrorsNTA = tbl.ListColumns("Total Errors NTA").Index
+    colIndexSigErrorsNTA = tbl.ListColumns("Significant Errors NTA").Index
+    colIndexCritErrorsNTA = tbl.ListColumns("Critical Errors NTA").Index
+    colIndexPendingCS = tbl.ListColumns("Shipments Pending CS").Index
+    colIndexTotalErrorsSSM = tbl.ListColumns("Total Errors SSM").Index
+    colIndexSigErrorsSSM = tbl.ListColumns("Significant Errrors SSM").Index
+    colIndexCritErrorsSSM = tbl.ListColumns("Critical Errors SSM").Index
+    colIndexTotalSDLErrors = tbl.ListColumns("Total SDL Errors").Index
+    colIndexTotalCSAErrors = tbl.ListColumns("Total CSA Errors").Index
+    colIndexTotalMODErrors = tbl.ListColumns("Total MOD Errors").Index
+    colIndexRegionNTA = tbl.ListColumns("Region Error NTA").Index
+    colIndexRegionSSM = tbl.ListColumns("Region Error SSM").Index
+    colIndexRegionCSA = tbl.ListColumns("Region Error CSA").Index
+    colIndexRegionMOD = tbl.ListColumns("Region Error MOD").Index
+    colIndexRegionSDL = tbl.ListColumns("Region Error SDL").Index
+    
+    
+    ' First row
+    Set newRow = tbl.ListRows.Add
+    newRow.Range.Cells(1, colIndexWeek).Value = weekValue + 1 ' Increment Week by 1
+    newRow.Range.Cells(1, colIndexRegion).Value = targetWB.Sheets(newSheetName).Range("T2").Value
+    newRow.Range.Cells(1, colIndexRegionTotal).Value = targetWB.Sheets(newSheetName).Range("T3").Value
+    newRow.Range.Cells(1, colIndexRegionErrors).Value = targetWB.Sheets(newSheetName).Range("T4").Value
+    newRow.Range.Cells(1, colIndexRegionP).Value = targetWB.Sheets(newSheetName).Range("T5").Value
+    newRow.Range.Cells(1, colIndexTotal).Value = targetWB.Sheets(newSheetName).Range("P3").Value
+    newRow.Range.Cells(1, colIndexTotalErrors).Value = targetWB.Sheets(newSheetName).Range("P4").Value
+    newRow.Range.Cells(1, colIndexTotalP).Value = targetWB.Sheets(newSheetName).Range("P5").Value
+    newRow.Range.Cells(1, colIndexNumberofRepeats).Value = targetWB.Sheets(newSheetName).Range("V22").Value
+    newRow.Range.Cells(1, colIndexTotalErrorsNTA).Value = NTA_Count
+    newRow.Range.Cells(1, colIndexSigErrorsNTA).Value = Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsNTA).Value = Bad_Count
+    newRow.Range.Cells(1, colIndexPendingCS).Value = HUB_Count
+    newRow.Range.Cells(1, colIndexTotalErrorsSSM).Value = SSM_Count
+    newRow.Range.Cells(1, colIndexSigErrorsSSM).Value = SSM_Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsSSM).Value = SSM_Bad_Count
+    newRow.Range.Cells(1, colIndexTotalSDLErrors).Value = SDL_Count
+    newRow.Range.Cells(1, colIndexTotalCSAErrors).Value = CSA_Count
+    newRow.Range.Cells(1, colIndexTotalMODErrors).Value = MOD_Count
+    newRow.Range.Cells(1, colIndexRegionNTA).Value = NTA_ASP_Count
+    newRow.Range.Cells(1, colIndexRegionSSM).Value = SSM_ASP_Count
+    newRow.Range.Cells(1, colIndexRegionCSA).Value = CSA_ASP_Count
+    newRow.Range.Cells(1, colIndexRegionMOD).Value = MOD_ASP_Count
+    newRow.Range.Cells(1, colIndexRegionSDL).Value = SDL_ASP_Count
+    
+    
+    ' Second row
+    Set newRow = tbl.ListRows.Add
+    newRow.Range.Cells(1, colIndexWeek).Value = weekValue + 1 ' Copy Week value from previous row
+    newRow.Range.Cells(1, colIndexRegion).Value = targetWB.Sheets(newSheetName).Range("U2").Value
+    newRow.Range.Cells(1, colIndexRegionTotal).Value = targetWB.Sheets(newSheetName).Range("U3").Value
+    newRow.Range.Cells(1, colIndexRegionErrors).Value = targetWB.Sheets(newSheetName).Range("U4").Value
+    newRow.Range.Cells(1, colIndexRegionP).Value = targetWB.Sheets(newSheetName).Range("U5").Value
+    newRow.Range.Cells(1, colIndexTotal).Value = targetWB.Sheets(newSheetName).Range("P3").Value
+    newRow.Range.Cells(1, colIndexTotalErrors).Value = targetWB.Sheets(newSheetName).Range("P4").Value
+    newRow.Range.Cells(1, colIndexTotalP).Value = targetWB.Sheets(newSheetName).Range("P5").Value
+    newRow.Range.Cells(1, colIndexNumberofRepeats).Value = targetWB.Sheets(newSheetName).Range("V22").Value
+    newRow.Range.Cells(1, colIndexTotalErrorsNTA).Value = NTA_Count
+    newRow.Range.Cells(1, colIndexSigErrorsNTA).Value = Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsNTA).Value = Bad_Count
+    newRow.Range.Cells(1, colIndexPendingCS).Value = HUB_Count
+    newRow.Range.Cells(1, colIndexTotalErrorsSSM).Value = SSM_Count
+    newRow.Range.Cells(1, colIndexSigErrorsSSM).Value = SSM_Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsSSM).Value = SSM_Bad_Count
+    newRow.Range.Cells(1, colIndexTotalSDLErrors).Value = SDL_Count
+    newRow.Range.Cells(1, colIndexTotalCSAErrors).Value = CSA_Count
+    newRow.Range.Cells(1, colIndexTotalMODErrors).Value = MOD_Count
+    newRow.Range.Cells(1, colIndexRegionNTA).Value = NTA_AME_Count
+    newRow.Range.Cells(1, colIndexRegionSSM).Value = SSM_AME_Count
+    newRow.Range.Cells(1, colIndexRegionCSA).Value = CSA_AME_Count
+    newRow.Range.Cells(1, colIndexRegionMOD).Value = MOD_AME_Count
+    newRow.Range.Cells(1, colIndexRegionSDL).Value = SDL_AME_Count
+    
+    ' Third row
+    Set newRow = tbl.ListRows.Add
+    newRow.Range.Cells(1, colIndexWeek).Value = weekValue + 1 ' Copy Week value from previous row
+    newRow.Range.Cells(1, colIndexRegion).Value = targetWB.Sheets(newSheetName).Range("V2").Value
+    newRow.Range.Cells(1, colIndexRegionTotal).Value = targetWB.Sheets(newSheetName).Range("V3").Value
+    newRow.Range.Cells(1, colIndexRegionErrors).Value = targetWB.Sheets(newSheetName).Range("V4").Value
+    newRow.Range.Cells(1, colIndexRegionP).Value = targetWB.Sheets(newSheetName).Range("V5").Value
+    newRow.Range.Cells(1, colIndexTotal).Value = targetWB.Sheets(newSheetName).Range("P3").Value
+    newRow.Range.Cells(1, colIndexTotalErrors).Value = targetWB.Sheets(newSheetName).Range("P4").Value
+    newRow.Range.Cells(1, colIndexTotalP).Value = targetWB.Sheets(newSheetName).Range("P5").Value
+    newRow.Range.Cells(1, colIndexNumberofRepeats).Value = targetWB.Sheets(newSheetName).Range("V22").Value
+    newRow.Range.Cells(1, colIndexTotalErrorsNTA).Value = NTA_Count
+    newRow.Range.Cells(1, colIndexSigErrorsNTA).Value = Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsNTA).Value = Bad_Count
+    newRow.Range.Cells(1, colIndexPendingCS).Value = HUB_Count
+    newRow.Range.Cells(1, colIndexTotalErrorsSSM).Value = SSM_Count
+    newRow.Range.Cells(1, colIndexSigErrorsSSM).Value = SSM_Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsSSM).Value = SSM_Bad_Count
+    newRow.Range.Cells(1, colIndexTotalSDLErrors).Value = SDL_Count
+    newRow.Range.Cells(1, colIndexTotalCSAErrors).Value = CSA_Count
+    newRow.Range.Cells(1, colIndexTotalMODErrors).Value = MOD_Count
+    newRow.Range.Cells(1, colIndexRegionNTA).Value = NTA_LAT_Count
+    newRow.Range.Cells(1, colIndexRegionSSM).Value = SSM_LAT_Count
+    newRow.Range.Cells(1, colIndexRegionCSA).Value = CSA_LAT_Count
+    newRow.Range.Cells(1, colIndexRegionMOD).Value = MOD_LAT_Count
+    newRow.Range.Cells(1, colIndexRegionSDL).Value = SDL_LAT_Count
+    
+    ' Fourth row
+    Set newRow = tbl.ListRows.Add
+    newRow.Range.Cells(1, colIndexWeek).Value = weekValue + 1 ' Copy Week value from previous row
+    newRow.Range.Cells(1, colIndexRegion).Value = targetWB.Sheets(newSheetName).Range("W2").Value
+    newRow.Range.Cells(1, colIndexRegionTotal).Value = targetWB.Sheets(newSheetName).Range("W3").Value
+    newRow.Range.Cells(1, colIndexRegionErrors).Value = targetWB.Sheets(newSheetName).Range("W4").Value
+    newRow.Range.Cells(1, colIndexRegionP).Value = targetWB.Sheets(newSheetName).Range("W5").Value
+    newRow.Range.Cells(1, colIndexTotal).Value = targetWB.Sheets(newSheetName).Range("P3").Value
+    newRow.Range.Cells(1, colIndexTotalErrors).Value = targetWB.Sheets(newSheetName).Range("P4").Value
+    newRow.Range.Cells(1, colIndexTotalP).Value = targetWB.Sheets(newSheetName).Range("P5").Value
+    newRow.Range.Cells(1, colIndexNumberofRepeats).Value = targetWB.Sheets(newSheetName).Range("V22").Value
+    newRow.Range.Cells(1, colIndexTotalErrorsNTA).Value = NTA_Count
+    newRow.Range.Cells(1, colIndexSigErrorsNTA).Value = Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsNTA).Value = Bad_Count
+    newRow.Range.Cells(1, colIndexPendingCS).Value = HUB_Count
+    newRow.Range.Cells(1, colIndexTotalErrorsSSM).Value = SSM_Count
+    newRow.Range.Cells(1, colIndexSigErrorsSSM).Value = SSM_Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsSSM).Value = SSM_Bad_Count
+    newRow.Range.Cells(1, colIndexTotalSDLErrors).Value = SDL_Count
+    newRow.Range.Cells(1, colIndexTotalCSAErrors).Value = CSA_Count
+    newRow.Range.Cells(1, colIndexTotalMODErrors).Value = MOD_Count
+    newRow.Range.Cells(1, colIndexRegionNTA).Value = NTA_NCE_Count
+    newRow.Range.Cells(1, colIndexRegionSSM).Value = SSM_NCE_Count
+    newRow.Range.Cells(1, colIndexRegionCSA).Value = CSA_NCE_Count
+    newRow.Range.Cells(1, colIndexRegionMOD).Value = MOD_NCE_Count
+    newRow.Range.Cells(1, colIndexRegionSDL).Value = SDL_NCE_Count
+    
+    ' Fifth row
+    Set newRow = tbl.ListRows.Add
+    newRow.Range.Cells(1, colIndexWeek).Value = weekValue + 1 ' Copy Week value from previous row
+    newRow.Range.Cells(1, colIndexRegion).Value = targetWB.Sheets(newSheetName).Range("X2").Value
+    newRow.Range.Cells(1, colIndexRegionTotal).Value = targetWB.Sheets(newSheetName).Range("X3").Value
+    newRow.Range.Cells(1, colIndexRegionErrors).Value = targetWB.Sheets(newSheetName).Range("X4").Value
+    newRow.Range.Cells(1, colIndexRegionP).Value = targetWB.Sheets(newSheetName).Range("X5").Value
+    newRow.Range.Cells(1, colIndexTotal).Value = targetWB.Sheets(newSheetName).Range("P3").Value
+    newRow.Range.Cells(1, colIndexTotalErrors).Value = targetWB.Sheets(newSheetName).Range("P4").Value
+    newRow.Range.Cells(1, colIndexTotalP).Value = targetWB.Sheets(newSheetName).Range("P5").Value
+    newRow.Range.Cells(1, colIndexNumberofRepeats).Value = targetWB.Sheets(newSheetName).Range("V22").Value
+    newRow.Range.Cells(1, colIndexTotalErrorsNTA).Value = NTA_Count
+    newRow.Range.Cells(1, colIndexSigErrorsNTA).Value = Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsNTA).Value = Bad_Count
+    newRow.Range.Cells(1, colIndexPendingCS).Value = HUB_Count
+    newRow.Range.Cells(1, colIndexTotalErrorsSSM).Value = SSM_Count
+    newRow.Range.Cells(1, colIndexSigErrorsSSM).Value = SSM_Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsSSM).Value = SSM_Bad_Count
+    newRow.Range.Cells(1, colIndexTotalSDLErrors).Value = SDL_Count
+    newRow.Range.Cells(1, colIndexTotalCSAErrors).Value = CSA_Count
+    newRow.Range.Cells(1, colIndexTotalMODErrors).Value = MOD_Count
+    newRow.Range.Cells(1, colIndexRegionNTA).Value = NTA_IND_Count
+    newRow.Range.Cells(1, colIndexRegionSSM).Value = SSM_IND_Count
+    newRow.Range.Cells(1, colIndexRegionCSA).Value = CSA_IND_Count
+    newRow.Range.Cells(1, colIndexRegionMOD).Value = MOD_IND_Count
+    newRow.Range.Cells(1, colIndexRegionSDL).Value = SDL_IND_Count
+    
+    ' Sixth row
+    Set newRow = tbl.ListRows.Add
+    newRow.Range.Cells(1, colIndexWeek).Value = weekValue + 1 ' Copy Week value from previous row
+    newRow.Range.Cells(1, colIndexRegion).Value = targetWB.Sheets(newSheetName).Range("Y2").Value
+    newRow.Range.Cells(1, colIndexRegionTotal).Value = targetWB.Sheets(newSheetName).Range("Y3").Value
+    newRow.Range.Cells(1, colIndexRegionErrors).Value = targetWB.Sheets(newSheetName).Range("Y4").Value
+    newRow.Range.Cells(1, colIndexRegionP).Value = targetWB.Sheets(newSheetName).Range("Y5").Value
+    newRow.Range.Cells(1, colIndexTotal).Value = targetWB.Sheets(newSheetName).Range("P3").Value
+    newRow.Range.Cells(1, colIndexTotalErrors).Value = targetWB.Sheets(newSheetName).Range("P4").Value
+    newRow.Range.Cells(1, colIndexTotalP).Value = targetWB.Sheets(newSheetName).Range("P5").Value
+    newRow.Range.Cells(1, colIndexNumberofRepeats).Value = targetWB.Sheets(newSheetName).Range("V22").Value
+    newRow.Range.Cells(1, colIndexTotalErrorsNTA).Value = NTA_Count
+    newRow.Range.Cells(1, colIndexSigErrorsNTA).Value = Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsNTA).Value = Bad_Count
+    newRow.Range.Cells(1, colIndexPendingCS).Value = HUB_Count
+    newRow.Range.Cells(1, colIndexTotalErrorsSSM).Value = SSM_Count
+    newRow.Range.Cells(1, colIndexSigErrorsSSM).Value = SSM_Neutral_Count
+    newRow.Range.Cells(1, colIndexCritErrorsSSM).Value = SSM_Bad_Count
+    newRow.Range.Cells(1, colIndexTotalSDLErrors).Value = SDL_Count
+    newRow.Range.Cells(1, colIndexTotalCSAErrors).Value = CSA_Count
+    newRow.Range.Cells(1, colIndexTotalMODErrors).Value = MOD_Count
+    newRow.Range.Cells(1, colIndexRegionNTA).Value = NTA_MED_Count
+    newRow.Range.Cells(1, colIndexRegionSSM).Value = SSM_MED_Count
+    newRow.Range.Cells(1, colIndexRegionCSA).Value = CSA_MED_Count
+    newRow.Range.Cells(1, colIndexRegionMOD).Value = MOD_MED_Count
+    newRow.Range.Cells(1, colIndexRegionSDL).Value = SDL_MED_Count
+    
+    '--------Refresh Pivot---------
+    ' Refresh PivotTables on the "Copy" sheet
+    Set wsCopy = targetWB.Sheets("Dashboard")
+
+    ' Loop through all PivotTables in the "Copy" sheet and refresh them
+    For Each pit In wsCopy.PivotTables
+        pit.RefreshTable
+    Next pit
+    
+    ' Set column widths for B to H at 10
+    copySheet.Columns("B:H").ColumnWidth = 10
+    copySheet.Columns("I:W").ColumnWidth = 13.2
+    
+    ' Set column widths in the "Internal" sheet
+    Set wsInternal = targetWB.Sheets("Internal")
+    wsInternal.Columns("B:H").ColumnWidth = 10
+    wsInternal.Columns("I:W").ColumnWidth = 13.2
+    
+    
+    MsgBox "Data copied, formatted, Pivot Tables, and Chart created successfully!", vbInformation
+
+End Sub
+
